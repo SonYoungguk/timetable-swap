@@ -34,7 +34,7 @@ export function demoDb(): Db {
 
   const room = (name: string, kind: string) => {
     const id = nid('r');
-    db.rooms[id] = { id, name, kind };
+    db.rooms[id] = { id, name, kind, capacity: kind === '선택교실' ? 30 : 32 };
     return id;
   };
   const sci = [1, 2, 3, 4].map((i) => room(`과학실${i}`, '과학실'));
@@ -60,7 +60,7 @@ export function demoDb(): Db {
     if (!t) {
       const id = nid('t');
       const k = Object.keys(db.teachers).length;
-      db.teachers[id] = { id, name: `${SURNAMES[k % SURNAMES.length]}${GIVEN[(k * 7) % GIVEN.length]}`, unavailable: [] };
+      db.teachers[id] = { id, name: `${SURNAMES[k % SURNAMES.length]}${GIVEN[(k * 7 + Math.floor(k / SURNAMES.length) * 3) % GIVEN.length]}`, unavailable: [] };
       t = { id, load: 0 };
       pool.push(t);
     }
@@ -133,6 +133,27 @@ export function demoDb(): Db {
   // 동아리: 전교생이 같은 시간에 (금요일 7교시에 고정)
   const club = lesson(classes.flat(), [{ subjectId: subject('동아리'), teacherId: null, roomId: null }], [1], '동아리');
   db.placements[`${club.id}:0`] = { id: `${club.id}:0`, lessonId: club.id, idx: 0, day: 4, period: 7, pinned: true };
+
+  // 과목에 필요한 교실 종류 (교과교실제)
+  const KIND: Record<string, string> = { 과학탐구실험: '과학실', 음악: '음악실', '음악 감상과 비평': '음악실', 미술: '미술실', '미술 창작': '미술실' };
+  for (const s of Object.values(db.subjects)) if (KIND[s.name]) s.roomKind = KIND[s.name];
+
+  // 학생: 학급당 24명. 2·3학년은 선택과목 묶음마다 강좌 하나를 고른다.
+  let seed = 7;
+  const rnd = () => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+  const bandLessons = Object.values(db.lessons).filter((l) => l.parts.length > 1);
+  let sn = 0;
+  for (const c of Object.values(db.classes))
+    for (let num = 1; num <= 24; num++) {
+      const id = nid('u');
+      const choices: Record<string, number> = {};
+      for (const b of bandLessons) if (b.classIds.includes(c.id)) choices[b.id] = Math.floor(rnd() * b.parts.length);
+      db.students[id] = { id, classId: c.id, num, name: `${SURNAMES[(sn * 3) % SURNAMES.length]}${GIVEN[(sn * 11 + num) % GIVEN.length]}`, choices };
+      sn++;
+    }
 
   // 순회 교사 한 명: 월·화에는 수업 불가
   const visiting = pools.get('제2외국어')?.[0];

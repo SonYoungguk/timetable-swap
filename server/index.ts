@@ -9,7 +9,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { streamSSE } from 'hono/streaming';
-import { COLLECTIONS, emptyDb } from '../shared/types.ts';
+import { COLLECTIONS, emptyDb, publishedView } from '../shared/types.ts';
 import type { CollectionName, Db, Op } from '../shared/types.ts';
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -62,14 +62,33 @@ function validOps(ops: unknown): ops is Op[] {
   });
 }
 
-type Listener = (payload: string) => void;
+/**
+ * 로그인하지 않은 사람에게 주는 자료: 게시된 시간표와 날짜별 변경만.
+ * 편성 중인 안, 학생 이름, 교사 수업 불가 시간은 내보내지 않는다.
+ */
+function guestDb(full: Db): Db {
+  const view = publishedView(full);
+  if (!view) return { ...emptyDb(), settings: full.settings.main ? { main: full.settings.main } : {} };
+  const students: Db['students'] = {};
+  for (const s of Object.values(view.students ?? {})) students[s.id] = { ...s, name: '' };
+  const teachers: Db['teachers'] = {};
+  for (const t of Object.values(view.teachers)) teachers[t.id] = { ...t, unavailable: [] };
+  return { ...view, students, teachers, published: {} };
+}
+
+type Listener = (payload: string, ops: Op[]) => void;
 const listeners = new Set<Listener>();
 
 const app = new Hono();
 const SESSION_COOKIE = 'tt_session';
 const isAdmin = (token: string | undefined) => !!token && !!sessionGet.get(token);
 
-app.get('/api/state', (c) => c.json({ db: loadAll(), admin: isAdmin(getCookie(c, SESSION_COOKIE)) }));
+app.get('/api/state', (c) => {
+  const admin = isAdmin(getCookie(c, SESSION_COOKIE));
+  const full = loadAll();
+  const publishedAt = full.published.main?.publishedAt ?? null;
+  return c.json({ db: admin ? full : guestDb(full), admin, publishedAt });
+});
 
 app.post('/api/login', async (c) => {
   const body = await c.req.json().catch(() => ({}));
@@ -107,17 +126,25 @@ app.post('/api/batch', async (c) => {
     return c.json({ error: '저장하지 못했습니다.' }, 500);
   }
   const payload = JSON.stringify({ clientId: String(body.clientId ?? ''), ops });
-  for (const l of listeners) l(payload);
+  for (const l of listeners) l(payload, ops);
   return c.json({ ok: true });
 });
 
 // 다른 사람이 바꾼 내용을 열려 있는 모든 화면에 바로 보낸다.
 app.get('/api/events', (c) =>
   streamSSE(c, async (stream) => {
-    const queue: string[] = [];
+    const admin = isAdmin(getCookie(c, SESSION_COOKIE));
+    const queue: { event: string; data: string }[] = [];
     let wake: (() => void) | null = null;
-    const listener: Listener = (payload) => {
-      queue.push(payload);
+    const listener: Listener = (payload, ops) => {
+      if (admin) queue.push({ event: 'ops', data: payload });
+      else if (ops.some((o) => o.collection === 'published')) queue.push({ event: 'reload', data: '' });
+      else {
+        // 비로그인 화면에는 날짜별 변경만 전한다.
+        const visible = ops.filter((o) => o.collection === 'changes');
+        if (!visible.length) return;
+        queue.push({ event: 'ops', data: JSON.stringify({ clientId: '', ops: visible }) });
+      }
       wake?.();
     };
     listeners.add(listener);
@@ -127,7 +154,7 @@ app.get('/api/events', (c) =>
     });
     try {
       while (!stream.aborted) {
-        while (queue.length) await stream.writeSSE({ event: 'ops', data: queue.shift()! });
+        while (queue.length) await stream.writeSSE(queue.shift()!);
         await new Promise<void>((r) => {
           wake = r;
           setTimeout(r, 25000);

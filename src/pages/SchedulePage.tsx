@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { unitsAt } from '../../shared/model.ts';
 import type { EntityKind } from '../../shared/model.ts';
 import type { SolveProgress, SolveResult } from '../../shared/solver.ts';
-import type { Op, Placement } from '../../shared/types.ts';
+import type { Db, Op, Placement } from '../../shared/types.ts';
 import { clearPlacements } from '../actions.ts';
 import { TimetableGrid, UnitCard } from '../Grid.tsx';
 import { useAnalysis, useIndex, useStore } from '../store.ts';
@@ -14,9 +14,10 @@ export function EntityPicker(props: {
   kind: EntityKind;
   id: string;
   onChange: (id: string) => void;
+  db?: Db;
 }) {
-  const db = useStore((s) => s.db);
-  const list = entitiesOf(db, props.kind);
+  const own = useStore((s) => s.db);
+  const list = entitiesOf(props.db ?? own, props.kind);
   const i = list.findIndex((e) => e.id === props.id);
   const step = (n: number) => list.length && props.onChange(list[(i + n + list.length) % list.length].id);
   return (
@@ -39,7 +40,7 @@ export function EntityPicker(props: {
 }
 
 /** 모든 학급(또는 교사)의 한 주를 한 표로 본다. */
-export function Overview(props: { kind: 'class' | 'teacher'; onPick?: (id: string) => void }) {
+export function Overview(props: { kind: EntityKind; onPick?: (id: string) => void }) {
   const db = useStore((s) => s.db);
   const index = useIndex();
   const analysis = useAnalysis();

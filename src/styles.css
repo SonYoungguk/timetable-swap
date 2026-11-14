@@ -179,3 +179,35 @@ table.mini td.none { background: #f3f4f6; cursor: default; }
   .panel, .grid, .overview-wrap { border: 0; padding: 0; overflow: visible; }
   .card, .overview td, .cell { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* 주간 시간표 · 수업 교체 */
+.grid-head small { color: var(--muted); font-weight: 400; }
+.grid-head.today { color: var(--accent); border-bottom: 3px solid var(--accent); }
+.week-label { padding: 5px 8px; font-weight: 600; white-space: nowrap; }
+.card.clickable { cursor: pointer; }
+.card.selected { outline: 3px solid var(--accent); outline-offset: -1px; z-index: 3; }
+.card.changed { border: 2px solid #d9822b; }
+.card.cancelled { opacity: 0.55; text-decoration: line-through; background: #eee !important; }
+.card.away { opacity: 0.5; border-style: dashed; background: #f3f4f6 !important; font-size: 12px; }
+.badge { margin-left: 5px; font-size: 10.5px; font-weight: 700; background: #d9822b; color: #fff; border-radius: 4px; padding: 0 4px; text-decoration: none; display: inline-block; }
+.badge.cancelled { background: var(--red); }
+.cell.clash { box-shadow: 0 0 0 2px var(--red); }
+.cell[class*='hint-'] { cursor: pointer; }
+.overview td.changed { outline: 2px solid #d9822b; outline-offset: -2px; }
+.change-list { list-style: none; margin: 0; padding: 0; }
+.change-list li { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 7px 4px; border-bottom: 1px solid #eceef1; }
+.issues label.note { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; font-size: 13px; }
+.issues select { width: 100%; }
+.publish { display: inline-flex; align-items: center; gap: 8px; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #1c2430; color: #fff; padding: 10px 16px; border-radius: 10px; z-index: 60; max-width: 92vw; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3); }
+@media (max-width: 700px) {
+  :root { --rowh: 54px; }
+  .grid.week { padding: 4px; gap: 2px; }
+  .grid.week .card { padding: 3px 4px; }
+  .grid.week .card-title { font-size: 13px; }
+  .grid.week .card-line { font-size: 11px; }
+  .top { padding: 8px 10px; gap: 8px; }
+  .grid.week .card.away:not(:only-child) { display: none; }
+  .seg { max-width: 100%; overflow-x: auto; }
+  .panel { padding: 10px; }
+}

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { analyze, buildIndex } from '../shared/model.ts';
 import type { Analysis, Index } from '../shared/model.ts';
-import { applyOps, emptyDb } from '../shared/types.ts';
+import { applyOps, emptyDb, publishedView } from '../shared/types.ts';
 import type { Db, Op } from '../shared/types.ts';
 
 const clientId = Math.random().toString(36).slice(2);
@@ -15,7 +15,7 @@ interface Store {
   undoStack: Op[][];
   redoStack: Op[][];
   load: () => Promise<void>;
-  mutate: (ops: Op[], record?: 'undo' | 'redo' | 'none') => void;
+  mutate: (ops: Op[], record?: 'undo' | 'redo' | 'none' | 'skip') => void;
   undo: () => void;
   redo: () => void;
   login: (password: string) => Promise<string | null>;
@@ -105,13 +105,13 @@ export const useStore = create<Store>((set, get) => ({
       body: JSON.stringify({ password }),
     });
     if (!res.ok) return (await res.json().catch(() => ({}))).error ?? '로그인하지 못했습니다.';
-    set({ admin: true });
+    await get().load();
     return null;
   },
 
   logout: async () => {
     await fetch('/api/logout', { method: 'POST' });
-    set({ admin: false, undoStack: [], redoStack: [] });
+    await get().load();
   },
 
   setError: (error) => set({ error }),
@@ -126,6 +126,7 @@ export function connectEvents() {
     if (msg.clientId === clientId) return;
     useStore.setState((s) => ({ db: applyOps(s.db, msg.ops) }));
   });
+  es.addEventListener('reload', () => void useStore.getState().load());
   es.onerror = () => {
     dropped = true;
   };
@@ -133,9 +134,7 @@ export function connectEvents() {
     // 끊겼다 다시 붙으면 그 사이 변경을 놓쳤을 수 있으니 전체를 다시 받는다.
     if (dropped) {
       dropped = false;
-      void fetch('/api/state')
-        .then((r) => r.json())
-        .then((b) => useStore.setState({ db: b.db }));
+      void useStore.getState().load();
     }
   };
   return () => es.close();
@@ -160,4 +159,20 @@ export function useAnalysis(): Analysis {
   const db = useStore((s) => s.db);
   ensure(db);
   return memoAnalysis!;
+}
+
+let memoPubKey: unknown[] = [];
+let memoPub: Db | null = null;
+/** 조회·교체 화면이 쓰는 게시된 시간표(+날짜별 변경). 게시 전이면 null. */
+export function usePub(): Db | null {
+  const db = useStore((s) => s.db);
+  const admin = useStore((s) => s.admin);
+  // 비로그인 화면은 서버가 이미 게시본만 내려 준다.
+  if (!admin) return Object.keys(db.classes).length ? db : null;
+  const key = [db.published, db.changes];
+  if (key.some((k, i) => k !== memoPubKey[i])) {
+    memoPubKey = key;
+    memoPub = publishedView(db);
+  }
+  return memoPub;
 }
