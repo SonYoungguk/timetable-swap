@@ -1,30 +1,32 @@
 {
-  "name": "scaffold",
+  "name": "school-timetable",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "dev": "concurrently -k \"tsx watch server/index.ts\" \"vite\"",
+    "build": "tsc --noEmit && vite build",
+    "start": "tsx server/index.ts",
+    "test": "tsx scripts/test-solver.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.110.8",
-    "@types/papaparse": "^5.5.2",
-    "lucide-react": "^1.26.0",
-    "next": "16.2.11",
-    "papaparse": "^5.5.4",
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "@hono/node-server": "^2.1.8",
+    "hono": "^4.13.18",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tsx": "^4.23.15",
+    "zustand": "^5.1.0"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.11",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "concurrently": "^10.0.7",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
   }
 }

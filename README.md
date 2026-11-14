@@ -1,60 +1,43 @@
-# 교과교실제 실시간 시간표 교환 시스템 (timetable-swap)
+# 학교 시간표
 
-교과교실제 운영 학교의 선생님들이 웹에서 시간표를 확인하고, 3중 중복 검증(교사·학반·교실)을 통과한 수업만 1:1로 안전하게 교환하는 시스템.
+한 학교가 쓰는 통합 시간표 웹앱. 시간표 편성 → 공개 → 수업 교체·실시간 공유 → 고교학점제·교과교실제 관리를 한 자료 구조 위에 차례로 얹는다.
 
-## 기술 스택
+## 지금 되는 것 (1단계: 편성)
 
-- **Frontend:** Next.js (App Router) + Tailwind CSS + Lucide React
-- **Backend/DB:** Supabase (PostgreSQL + Realtime + RPC)
-- 최종 교환은 PostgreSQL 함수 `execute_swap`이 행 잠금 상태에서 재검증 후 원자적으로 수행 → 동시 교환 경합에도 안전
+- **기초 자료**: 학교 설정(요일별 교시 수, 점심, 교사 권장 시수), 교사(수업 불가 시간), 과목, 교실, 학급. 엑셀에서 복사해 여러 줄 붙여넣기 가능.
+- **수업 배정**: 학급·과목·교사·교실·주당 시수·연강. 합반과 선택과목 묶음(같은 시간에 여러 강좌가 열리는 수업) 지원. 학급별 시수 합계 확인.
+- **시간표 편성**: 자동 편성(전부 다시 / 빈 수업만 채우기), 끌어다 놓기 수동 조정, 맞바꾸기, 고정(📌), 실행 취소, 충돌·권장 사항 검사. 학급별·교사별·교실별·전체 보기.
+- **조회·인쇄**: 로그인하지 않은 사람은 읽기 전용 조회 화면만 본다. 편성 담당자가 고치면 열려 있는 모든 화면에 바로 반영된다.
 
 ## 실행
 
+Node.js 22.13 이상이 필요하다.
+
 ```bash
 npm install
-npm run dev
+npm run build
+ADMIN_PASSWORD=원하는비밀번호 npm start
 ```
 
-- `.env.local`에 Supabase 키가 **없으면 데모 모드**로 동작한다: 내장 샘플 시간표로 UI 전체(후보 추출·교환·교사 전환)를 체험할 수 있고, 교환은 브라우저 메모리에서만 반영된다.
-- 실제 운영 모드: Supabase 프로젝트 생성 → SQL Editor에서 `supabase/schema.sql`, `supabase/seed.sql` 실행 → `.env.local` 작성:
-  ```
-  NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
-  NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
-  ```
+브라우저에서 http://localhost:8787 을 열고 오른쪽 위 **편성 담당자 로그인**. 처음이라면 기초 자료 → 학교 설정 → **예시 학교 불러오기**.
 
-## 파일 구성
+- `ADMIN_PASSWORD` 를 정하지 않으면 시작할 때마다 임시 비밀번호를 만들어 터미널에 보여 준다.
+- 자료는 `data/timetable.db` (SQLite) 한 파일에 저장된다. 이 파일을 복사하면 백업이다. 위치는 `DB_PATH`, 포트는 `PORT` 로 바꾼다.
+- 개발할 때는 `npm run dev` (화면 http://localhost:5173), 자동 편성 검증은 `npm test`.
 
-| 파일 | 역할 |
-|---|---|
-| `supabase/schema.sql` | 테이블·뷰·RLS·Realtime 설정 + `execute_swap` RPC (서버측 3중 검증 & 원자적 교환) |
-| `supabase/seed.sql` | 개발용 샘플 데이터 |
-| `src/lib/swap-validator.ts` | `getSwappableSlots(slotA, all)` — 클라이언트 3중 중복 검증, 불가 사유 포함 |
-| `src/lib/types.ts` | 공용 타입/상수 (`Schedule`, 요일·교시) |
-| `src/lib/data-provider.ts` | Supabase 모드 / 데모 모드 전환 (조회·교환·실시간 구독 추상화) |
-| `src/components/TimetableGrid.tsx` | 시간표 격자 UI — 하이라이트/Dimmed/Tooltip/확인 모달 |
-| `src/hooks/useRealtimeSchedules.ts` | 실시간 구독 → 전 사용자 화면 즉시 갱신 |
-| `src/app/page.tsx` | 시간표 조회·교환 메인 페이지 |
-| `src/app/admin/page.tsx` | 관리자 페이지 — CSV 업로드로 기초 데이터 일괄 등록 |
+## 구조
 
-## 3중 중복 검증 (6개 항목)
+| 위치 | 내용 |
+| --- | --- |
+| `shared/types.ts` | 자료 구조 (교사·과목·교실·학급·수업·배치) |
+| `shared/model.ts` | 충돌 검사, 권장 사항 검사 |
+| `shared/solver.ts` | 자동 편성 (탐욕 초안 + 담금질, 켐페 사슬 교환) |
+| `server/index.ts` | 저장, 로그인, 실시간 전파 |
+| `src/` | 화면 (React) |
 
-수업 A(T1)와 수업 B(T2)를 교환할 때, **교환이 완료된 상태**를 가정하고 검증한다
-(따라서 점유 검사에서 A·B 자신은 제외 — 교환하면 원래 시간을 비우므로):
+## 다음 단계
 
-| # | 조건 | 검증 코드 |
-|---|---|---|
-| 1 | A교사가 T2에 수업 없음 | `TEACHER_A_BUSY_AT_B` |
-| 2 | B교사가 T1에 수업 없음 | `TEACHER_B_BUSY_AT_A` |
-| 3 | A학반이 T2에 수업 없음 | `CLASS_A_BUSY_AT_B` |
-| 4 | B학반이 T1에 수업 없음 | `CLASS_B_BUSY_AT_A` |
-| 5 | A 전용 교실이 T2에 빔 | `ROOM_A_OCCUPIED_AT_B` |
-| 6 | B 전용 교실이 T1에 빔 | `ROOM_B_OCCUPIED_AT_A` |
-
-같은 코드가 클라이언트(`getSwappableSlots`)와 서버(`execute_swap`) 양쪽에서 사용된다.
-클라이언트 검증은 UI 후보 추출용, 서버 검증이 최종 안전장치다. 추가로 schedules 테이블의
-`unique (teacher|class|room, day, period)` 제약이 DB 레벨 3중 방어선 역할을 한다.
-
-## 다음 단계 (미구현)
-
-- Supabase Auth 연동 — 현재는 데모용 교사 선택 드롭다운으로 로그인을 대체
-- 교환 이력(swap_logs) 조회 화면 및 되돌리기
+2. 공개: 확정본 게시(편성 중인 안과 분리), 학생·학부모용 주소, 휴대폰 화면
+3. 교체: 날짜별 수업 교체·보강·결강, 교사 알림, 교체 이력
+4. 고교학점제: 학생별 수강 신청 자료, 선택과목 묶음 자동 구성, 학생 개인 시간표
+5. 교과교실제: 교실 종류·수용 인원에 따른 교실 자동 배정, 교실 가동률
