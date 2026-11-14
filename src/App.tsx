@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { SNAPSHOT, getSettings } from '../shared/types.ts';
 import type { Db, Op, Published } from '../shared/types.ts';
 import { ChangesPage } from './pages/ChangesPage.tsx';
+import { RoomsPage } from './pages/RoomsPage.tsx';
+import { StudentsPage } from './pages/StudentsPage.tsx';
 import { LessonsPage } from './pages/LessonsPage.tsx';
 import { SchedulePage } from './pages/SchedulePage.tsx';
 import { SetupPage } from './pages/SetupPage.tsx';
@@ -13,6 +15,8 @@ const PAGES = [
   ['setup', '① 기초 자료'],
   ['lessons', '② 수업 배정'],
   ['schedule', '③ 시간표 편성'],
+  ['students', '학생·수강'],
+  ['rooms', '교실'],
   ['changes', '수업 교체'],
   ['view', '조회·인쇄'],
 ] as const;
@@ -135,6 +139,8 @@ export function App() {
       {current === 'setup' && <SetupPage />}
       {current === 'lessons' && <LessonsPage />}
       {current === 'schedule' && <SchedulePage />}
+      {current === 'students' && <StudentsPage />}
+      {current === 'rooms' && <RoomsPage />}
       {current === 'changes' && <ChangesPage />}
       {current === 'view' && <ViewPage />}
       {loginOpen && <LoginDialog onClose={() => setLoginOpen(false)} />}

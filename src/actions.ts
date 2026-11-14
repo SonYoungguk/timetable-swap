@@ -44,6 +44,8 @@ export function deleteTeacherOrRoom(kind: 'teachers' | 'rooms', id: string) {
     if (!l.parts.some((p) => p[field] === id)) continue;
     ops.push(put('lessons', { ...l, parts: l.parts.map((p) => (p[field] === id ? { ...p, [field]: null } : p)) }));
   }
+  if (kind === 'rooms')
+    for (const t of Object.values(db.teachers)) if (t.roomId === id) ops.push(put('teachers', { ...t, roomId: null }));
   ops.push({ op: 'del', collection: kind, id });
   mutate(ops);
 }

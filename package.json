@@ -10,7 +10,7 @@
     "dev": "concurrently -k \"tsx watch server/index.ts\" \"vite\"",
     "build": "tsc --noEmit && vite build",
     "start": "tsx server/index.ts",
-    "test": "tsx scripts/test-solver.ts"
+    "test": "tsx scripts/test-solver.ts && tsx scripts/test-rooms.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.8",

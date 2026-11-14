@@ -205,6 +205,7 @@ function TeachersTab() {
             <th>이름</th>
             <th>주당 수업</th>
             <th>수업 불가 시간</th>
+            <th>전용 교실 (교과교실제)</th>
             <th />
           </tr>
         </thead>
@@ -217,6 +218,16 @@ function TeachersTab() {
               <td>{hours.get(t.id) ?? 0}시간</td>
               <td>
                 <button onClick={() => setEditing(t)}>{t.unavailable.length ? `${t.unavailable.length}칸 불가` : '설정'}</button>
+              </td>
+              <td>
+                <select value={t.roomId ?? ''} onChange={(e) => mutate([put('teachers', { ...t, roomId: e.target.value || null })])}>
+                  <option value="">없음</option>
+                  {sortedByName(db.rooms).map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
               </td>
               <td>
                 <button
@@ -261,6 +272,7 @@ function SubjectsTab() {
             <th>과목</th>
             <th>약칭 (시간표 표시)</th>
             <th>색</th>
+            <th>필요한 교실 종류</th>
             <th />
           </tr>
         </thead>
@@ -275,6 +287,16 @@ function SubjectsTab() {
               </td>
               <td>
                 <input type="color" value={s.color} onChange={(e) => mutate([put('subjects', { ...s, color: e.target.value })])} />
+              </td>
+              <td>
+                <select value={s.roomKind ?? ''} onChange={(e) => mutate([put('subjects', { ...s, roomKind: e.target.value || undefined })])}>
+                  <option value="">상관없음</option>
+                  {[...new Set(Object.values(db.rooms).map((r) => r.kind).filter(Boolean))].sort().map((k) => (
+                    <option key={k} value={k}>
+                      {k}
+                    </option>
+                  ))}
+                </select>
               </td>
               <td>
                 <button
@@ -306,14 +328,15 @@ function RoomsTab() {
       </p>
       <BulkAdd
         label="교실 추가"
-        hint={'교실 이름을 한 줄에 하나씩. 종류를 같이 넣으려면 탭이나 쉼표로 구분하세요.\n예) 과학실1, 과학실'}
-        onAdd={(rows) => mutate(rows.map((r) => put('rooms', { id: newId(), name: r[0], kind: r[1] || '' })))}
+        hint={'교실 이름을 한 줄에 하나씩. 종류를 같이 넣으려면 탭이나 쉼표로 구분하세요.\n예) 과학실1, 과학실, 30   (이름, 종류, 수용 인원)'}
+        onAdd={(rows) => mutate(rows.map((r) => put('rooms', { id: newId(), name: r[0], kind: r[1] || '', capacity: Math.max(0, Math.round(Number(r[2]) || 0)) })))}
       />
       <table className="data">
         <thead>
           <tr>
             <th>교실</th>
             <th>종류</th>
+            <th>수용 인원</th>
             <th />
           </tr>
         </thead>
@@ -325,6 +348,9 @@ function RoomsTab() {
               </td>
               <td>
                 <TextCell value={r.kind} onCommit={(v) => mutate([put('rooms', { ...r, kind: v.trim() })])} />
+              </td>
+              <td>
+                <TextCell type="number" min={0} width={70} value={r.capacity ? String(r.capacity) : ''} onCommit={(v) => mutate([put('rooms', { ...r, capacity: Math.max(0, Math.round(Number(v) || 0)) })])} />
               </td>
               <td>
                 <button className="ghost danger" onClick={() => confirm(`${r.name}을(를) 지울까요?`) && deleteTeacherOrRoom('rooms', r.id)}>
@@ -391,7 +417,11 @@ function ClassesTab() {
                   onClick={() => {
                     const n = lessonsUsing(db, 'classes', c.id);
                     if (n) alert(`이 학급의 수업이 ${n}개 있습니다. 수업 배정에서 먼저 지워 주세요.`);
-                    else mutate([{ op: 'del', collection: 'classes', id: c.id }]);
+                    else {
+                      const inClass = Object.values(db.students).filter((s) => s.classId === c.id);
+                      if (inClass.length && !confirm(`${c.name} 학급과 학생 ${inClass.length}명을 함께 지울까요?`)) return;
+                      mutate([...inClass.map((s): Op => ({ op: 'del', collection: 'students', id: s.id })), { op: 'del', collection: 'classes', id: c.id }]);
+                    }
                   }}
                 >
                   삭제
