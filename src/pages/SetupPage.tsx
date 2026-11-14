@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { lessonHours, sortedByName, sortedClasses } from '../../shared/model.ts';
 import { getSettings } from '../../shared/types.ts';
 import type { CollectionName, Collections, Op, Settings, Teacher } from '../../shared/types.ts';
-import { clearAll, deleteTeacherOrRoom, lessonsUsing, loadDemo } from '../actions.ts';
+import { clearAll, deleteTeacherOrRoom, importDb, lessonsUsing, loadDemo } from '../actions.ts';
 import { newId, useStore } from '../store.ts';
 import { Modal } from '../ui.tsx';
 
@@ -172,6 +172,37 @@ function SettingsTab() {
         >
           예시 학교 불러오기
         </button>
+        <button
+          onClick={() => {
+            const blob = new Blob([JSON.stringify(db)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `시간표-${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+          }}
+        >
+          파일로 내보내기
+        </button>
+        <label className="file-button">
+          파일에서 가져오기
+          <input
+            type="file"
+            accept="application/json,.json"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (!file) return;
+              try {
+                const data = JSON.parse(await file.text());
+                if (!data || typeof data !== 'object' || !data.lessons) throw new Error();
+                if (confirm('지금 있는 자료를 모두 지우고 이 파일의 자료로 바꿀까요?')) importDb(data);
+              } catch {
+                alert('시간표 자료 파일이 아닙니다.');
+              }
+            }}
+          />
+        </label>
         <button
           className="danger"
           onClick={() => {

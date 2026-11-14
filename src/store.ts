@@ -4,6 +4,13 @@ import type { Analysis, Index } from '../shared/model.ts';
 import { applyOps, emptyDb, publishedView } from '../shared/types.ts';
 import type { Db, Op } from '../shared/types.ts';
 
+/**
+ * 서버 없이 여는 방식(GitHub Pages 등). 자료를 이 브라우저에만 저장하고 로그인 없이 편집한다.
+ * 다른 사람과 공유되지 않는다.
+ */
+export const STATIC = import.meta.env.VITE_STATIC === '1';
+const LOCAL_KEY = 'tt-db';
+
 const clientId = Math.random().toString(36).slice(2);
 export const newId = () => Math.random().toString(36).slice(2, 10);
 
@@ -48,6 +55,16 @@ export const useStore = create<Store>((set, get) => ({
   redoStack: [],
 
   load: async () => {
+    if (STATIC) {
+      let db = emptyDb();
+      try {
+        db = { ...db, ...JSON.parse(localStorage.getItem(LOCAL_KEY) ?? '{}') };
+      } catch {
+        /* 저장된 자료를 읽지 못하면 빈 상태로 시작한다 */
+      }
+      set({ db, admin: true, loaded: true });
+      return;
+    }
     try {
       const res = await fetch('/api/state');
       const body = await res.json();
@@ -66,6 +83,14 @@ export const useStore = create<Store>((set, get) => ({
       undoStack: record === 'redo' ? undoStack : record === 'undo' || record === 'none' ? [...undoStack.slice(-99), inverse] : undoStack,
       redoStack: record === 'redo' ? [...redoStack, inverse] : record === 'undo' ? [] : redoStack,
     });
+    if (STATIC) {
+      try {
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(get().db));
+      } catch {
+        set({ error: '브라우저 저장 공간에 저장하지 못했습니다. 학교 설정에서 자료를 파일로 내보내 두세요.' });
+      }
+      return;
+    }
     chain = chain.then(async () => {
       try {
         const res = await fetch('/api/batch', {
@@ -119,6 +144,12 @@ export const useStore = create<Store>((set, get) => ({
 
 /** 다른 화면에서 바꾼 내용을 받아 반영한다. */
 export function connectEvents() {
+  if (STATIC) {
+    // 같은 브라우저의 다른 탭에서 바꾼 내용을 따라간다.
+    const onStorage = (e: StorageEvent) => e.key === LOCAL_KEY && void useStore.getState().load();
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }
   const es = new EventSource('/api/events');
   let dropped = false;
   es.addEventListener('ops', (e) => {

@@ -8,7 +8,7 @@ import { LessonsPage } from './pages/LessonsPage.tsx';
 import { SchedulePage } from './pages/SchedulePage.tsx';
 import { SetupPage } from './pages/SetupPage.tsx';
 import { ViewPage } from './pages/ViewPage.tsx';
-import { connectEvents, useAnalysis, useStore } from './store.ts';
+import { STATIC, connectEvents, useAnalysis, useStore } from './store.ts';
 import { Modal } from './ui.tsx';
 
 const PAGES = [
@@ -129,8 +129,14 @@ export function App() {
         </nav>
         <span className="spacer" />
         {admin && <PublishControl />}
-        {admin ? <button onClick={() => void logout()}>로그아웃</button> : <button onClick={() => setLoginOpen(true)}>편성 담당자 로그인</button>}
+        {STATIC ? null : admin ? <button onClick={() => void logout()}>로그아웃</button> : <button onClick={() => setLoginOpen(true)}>편성 담당자 로그인</button>}
       </header>
+      {STATIC && (
+        <div className="static-note no-print">
+          <b>혼자 쓰는 모드</b> — 서버 없이 열려 있어 자료가 <b>이 브라우저에만</b> 저장되고 다른 사람에게는 보이지 않습니다. 기초 자료 → 학교 설정에서
+          파일로 내보내 백업해 두세요.
+        </div>
+      )}
       {error && (
         <div className="error no-print" role="alert">
           {error} <button onClick={() => setError(null)}>닫기</button>

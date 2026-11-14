@@ -88,3 +88,11 @@ export function loadDemo() {
   for (const c of COLLECTIONS) for (const doc of Object.values(demo[c])) ops.push(put(c, doc));
   mutate(ops);
 }
+
+/** 파일에서 읽은 자료로 전체를 바꾼다. */
+export function importDb(data: Partial<Db>) {
+  const { db, mutate } = state();
+  const ops = wipeOps(db);
+  for (const c of COLLECTIONS) for (const doc of Object.values(data[c] ?? {})) if (doc && typeof doc.id === 'string') ops.push(put(c, doc));
+  mutate(ops);
+}

@@ -223,3 +223,8 @@ table.mini td.none { background: #f3f4f6; cursor: default; }
   .modal { box-shadow: none; width: auto; }
   body:has(.modal) .page > *:not(.modal-back) { display: none; }
 }
+
+.static-note { background: #fff7e0; border-bottom: 1px solid #f0dca4; padding: 7px 20px; font-size: 13px; }
+.file-button { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 5px 11px; cursor: pointer; font-weight: 400 !important; flex-direction: row !important; }
+.file-button:hover { background: #eef1f6; }
+.file-button input { display: none; }
