@@ -39,11 +39,10 @@ Node.js 22.13 이상이 필요하다.
 
 ```bash
 npm install
-npm run build
 ADMIN_PASSWORD=원하는비밀번호 npm start
 ```
 
-브라우저에서 http://localhost:8787 을 열고 오른쪽 위 **편성 담당자 로그인**. 처음이라면 기초 자료 → 학교 설정 → **예시 학교 불러오기**.
+`npm start` 는 화면을 빌드한 뒤 서버를 켠다(Windows 에서는 비밀번호를 `set ADMIN_PASSWORD=...` 로 먼저 정한다). 브라우저에서 http://localhost:8787 을 열고 오른쪽 위 **편성 담당자 로그인**. 처음이라면 기초 자료 → 학교 설정 → **예시 학교 불러오기**.
 
 - `ADMIN_PASSWORD` 를 정하지 않으면 시작할 때마다 임시 비밀번호를 만들어 터미널에 보여 준다.
 - 자료는 `data/timetable.db` (SQLite) 한 파일에 저장된다. 이 파일을 복사하면 백업이다. 위치는 `DB_PATH`, 포트는 `PORT` 로 바꾼다.

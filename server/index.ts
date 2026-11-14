@@ -172,6 +172,19 @@ if (existsSync('dist/index.html')) {
   app.use('/*', serveStatic({ root: './dist' }));
   const html = readFileSync('dist/index.html', 'utf8');
   app.get('*', (c) => c.html(html));
+} else {
+  // 화면을 아직 빌드하지 않았을 때 빈 화면 대신 방법을 알려 준다.
+  app.get('*', (c) =>
+    c.html(
+      `<!doctype html><meta charset="utf-8"><title>학교 시간표</title>
+       <body style="font-family:sans-serif;max-width:560px;margin:80px auto;line-height:1.7">
+       <h2>화면 파일이 아직 만들어지지 않았습니다</h2>
+       <p>터미널에서 <code>npm start</code> 로 실행하면 화면을 자동으로 만든 뒤 서버를 켭니다.</p>
+       <p>개발 모드(<code>npm run dev</code>)로 실행했다면 이 주소가 아니라
+       <a href="http://localhost:5173">http://localhost:5173</a> 을 여세요.</p></body>`,
+      503,
+    ),
+  );
 }
 
 serve({ fetch: app.fetch, port: PORT }, () => console.log(`시간표 서버: http://localhost:${PORT}`));
