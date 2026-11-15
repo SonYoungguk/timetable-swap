@@ -1,4 +1,4 @@
-# main 에 올릴 때마다 서버 없는 "혼자 쓰는 모드"로 빌드해 GitHub Pages 에 올린다.
+# main 에 올릴 때마다 Supabase 에 연결되는 화면을 빌드해 GitHub Pages 에 올린다.
 # 저장소 Settings → Pages → Source 가 "GitHub Actions" 여야 한다.
 name: GitHub Pages
 
@@ -31,7 +31,9 @@ jobs:
       - run: npm ci
       - run: npx vite build
         env:
-          VITE_STATIC: '1'
+          # 공개용(publishable) 키라 저장소에 두어도 된다. 접근 권한은 Supabase 의 RLS 규칙이 막는다.
+          VITE_SUPABASE_URL: https://iunhobhlcsiianixjrih.supabase.co
+          VITE_SUPABASE_KEY: sb_publishable_y-jpiV_AprtCadEZFRFjvA_ym3i1cHC
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

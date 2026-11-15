@@ -9,7 +9,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { streamSSE } from 'hono/streaming';
-import { COLLECTIONS, emptyDb, publishedView } from '../shared/types.ts';
+import { COLLECTIONS, emptyDb, guestSnapshot, publishedView } from '../shared/types.ts';
 import type { CollectionName, Db, Op } from '../shared/types.ts';
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -69,11 +69,7 @@ function validOps(ops: unknown): ops is Op[] {
 function guestDb(full: Db): Db {
   const view = publishedView(full);
   if (!view) return { ...emptyDb(), settings: full.settings.main ? { main: full.settings.main } : {} };
-  const students: Db['students'] = {};
-  for (const s of Object.values(view.students ?? {})) students[s.id] = { ...s, name: '' };
-  const teachers: Db['teachers'] = {};
-  for (const t of Object.values(view.teachers)) teachers[t.id] = { ...t, unavailable: [] };
-  return { ...view, students, teachers, published: {} };
+  return { ...view, ...guestSnapshot(full.published.main!.snapshot), published: {}, public: {} };
 }
 
 type Listener = (payload: string, ops: Op[]) => void;

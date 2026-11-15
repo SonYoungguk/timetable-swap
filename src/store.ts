@@ -3,12 +3,13 @@ import { analyze, buildIndex } from '../shared/model.ts';
 import type { Analysis, Index } from '../shared/model.ts';
 import { applyOps, emptyDb, publishedView } from '../shared/types.ts';
 import type { Db, Op } from '../shared/types.ts';
+import { SUPABASE, loadState, pushOps, signIn, signOut, subscribe } from './supa.ts';
 
 /**
  * 서버 없이 여는 방식(GitHub Pages 등). 자료를 이 브라우저에만 저장하고 로그인 없이 편집한다.
  * 다른 사람과 공유되지 않는다.
  */
-export const STATIC = import.meta.env.VITE_STATIC === '1';
+export const STATIC = !SUPABASE && import.meta.env.VITE_STATIC === '1';
 const LOCAL_KEY = 'tt-db';
 
 const clientId = Math.random().toString(36).slice(2);
@@ -25,7 +26,7 @@ interface Store {
   mutate: (ops: Op[], record?: 'undo' | 'redo' | 'none' | 'skip') => void;
   undo: () => void;
   redo: () => void;
-  login: (password: string) => Promise<string | null>;
+  login: (password: string, email?: string) => Promise<string | null>;
   logout: () => Promise<void>;
   setError: (e: string | null) => void;
 }
@@ -65,6 +66,15 @@ export const useStore = create<Store>((set, get) => ({
       set({ db, admin: true, loaded: true });
       return;
     }
+    if (SUPABASE) {
+      try {
+        const state = await loadState();
+        set({ ...state, loaded: true, undoStack: [], redoStack: [] });
+      } catch {
+        set({ error: '시간표 자료를 불러오지 못했습니다. 잠시 뒤 새로고침해 주세요.', loaded: true });
+      }
+      return;
+    }
     try {
       const res = await fetch('/api/state');
       const body = await res.json();
@@ -93,6 +103,7 @@ export const useStore = create<Store>((set, get) => ({
     }
     chain = chain.then(async () => {
       try {
+        if (SUPABASE) return await pushOps(ops, clientId);
         const res = await fetch('/api/batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -123,7 +134,12 @@ export const useStore = create<Store>((set, get) => ({
     get().mutate(ops, 'none');
   },
 
-  login: async (password) => {
+  login: async (password, email) => {
+    if (SUPABASE) {
+      const error = await signIn(email ?? '', password);
+      if (!error) await get().load();
+      return error;
+    }
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -135,6 +151,11 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   logout: async () => {
+    if (SUPABASE) {
+      await signOut();
+      await get().load();
+      return;
+    }
     await fetch('/api/logout', { method: 'POST' });
     await get().load();
   },
@@ -144,6 +165,13 @@ export const useStore = create<Store>((set, get) => ({
 
 /** 다른 화면에서 바꾼 내용을 받아 반영한다. */
 export function connectEvents() {
+  if (SUPABASE)
+    return subscribe(
+      clientId,
+      useStore.getState().admin,
+      (ops) => useStore.setState((s) => ({ db: applyOps(s.db, ops) })),
+      () => void useStore.getState().load(),
+    );
   if (STATIC) {
     // 같은 브라우저의 다른 탭에서 바꾼 내용을 따라간다.
     const onStorage = (e: StorageEvent) => e.key === LOCAL_KEY && void useStore.getState().load();

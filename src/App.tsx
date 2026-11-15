@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { SNAPSHOT, getSettings } from '../shared/types.ts';
-import type { Db, Op, Published } from '../shared/types.ts';
+import { guestSnapshot } from '../shared/types.ts';
+import type { Db, Op, PublicView, Published } from '../shared/types.ts';
+import { SUPABASE, signUp } from './supa.ts';
 import { ChangesPage } from './pages/ChangesPage.tsx';
 import { RoomsPage } from './pages/RoomsPage.tsx';
 import { StudentsPage } from './pages/StudentsPage.tsx';
@@ -24,30 +26,75 @@ type PageKey = (typeof PAGES)[number][0];
 
 function LoginDialog(props: { onClose: () => void }) {
   const login = useStore((s) => s.login);
+  const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
-  const [err, setErr] = useState<string | null>(null);
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    setBusy(true);
+    setMsg(null);
+    if (mode === 'signup') {
+      const r = await signUp(email.trim(), pw);
+      if (r.error) setMsg(r.error);
+      else if (r.confirm) {
+        setMsg('확인 메일을 보냈습니다. 메일의 링크를 누른 뒤 여기서 로그인해 주세요.');
+        setMode('login');
+      } else {
+        const error = await login(pw, email.trim());
+        if (error) setMsg(error);
+        else props.onClose();
+      }
+    } else {
+      const error = await login(pw, email.trim());
+      if (error) setMsg(error);
+      else props.onClose();
+    }
+    setBusy(false);
+  };
   return (
-    <Modal title="편성 담당자 로그인" onClose={props.onClose}>
+    <Modal title={mode === 'signup' ? '편성 담당자 계정 만들기' : '편성 담당자 로그인'} onClose={props.onClose}>
       <form
         className="form"
-        onSubmit={async (e) => {
+        onSubmit={(e) => {
           e.preventDefault();
-          const error = await login(pw);
-          if (error) setErr(error);
-          else props.onClose();
+          void submit();
         }}
       >
+        {SUPABASE && (
+          <label>
+            이메일
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus required />
+          </label>
+        )}
         <label>
-          관리자 비밀번호
-          <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoFocus />
+          {SUPABASE ? '비밀번호' : '관리자 비밀번호'}
+          <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoFocus={!SUPABASE} required minLength={SUPABASE && mode === 'signup' ? 8 : undefined} />
         </label>
-        {err && <p className="warn">{err}</p>}
+        {msg && <p className="warn">{msg}</p>}
+        {SUPABASE && (
+          <p className="muted" style={{ fontSize: 13 }}>
+            {mode === 'login' ? (
+              <>
+                처음이신가요?{' '}
+                <a href="#" onClick={(e) => (e.preventDefault(), setMode('signup'), setMsg(null))}>
+                  계정 만들기
+                </a>{' '}
+                — 가장 먼저 로그인한 계정이 편성 담당자가 됩니다.
+              </>
+            ) : (
+              <a href="#" onClick={(e) => (e.preventDefault(), setMode('login'), setMsg(null))}>
+                이미 계정이 있습니다
+              </a>
+            )}
+          </p>
+        )}
         <div className="actions">
           <button type="button" onClick={props.onClose}>
             취소
           </button>
-          <button className="primary" type="submit">
-            로그인
+          <button className="primary" type="submit" disabled={busy}>
+            {mode === 'signup' ? '계정 만들기' : '로그인'}
           </button>
         </div>
       </form>
@@ -82,8 +129,13 @@ function PublishControl() {
     if (!confirm(msg)) return;
     const snapshot = Object.fromEntries(SNAPSHOT.map((c) => [c, db[c]])) as Published['snapshot'];
     const doc: Published = { id: 'main', publishedAt: Date.now(), snapshot };
-    const op: Op = { op: 'put', collection: 'published', doc: doc as unknown as { id: string } & Record<string, unknown> };
-    mutate([op], 'skip');
+    // 로그인하지 않은 사람이 받는 공개본은 학생 이름 등을 뺀 것을 따로 둔다.
+    const open: PublicView = { id: 'main', publishedAt: doc.publishedAt, snapshot: guestSnapshot(snapshot) };
+    const ops: Op[] = [
+      { op: 'put', collection: 'published', doc: doc as unknown as { id: string } & Record<string, unknown> },
+      { op: 'put', collection: 'public', doc: open as unknown as { id: string } & Record<string, unknown> },
+    ];
+    mutate(ops, 'skip');
   };
   return (
     <span className="publish">

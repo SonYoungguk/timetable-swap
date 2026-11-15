@@ -122,6 +122,21 @@ export interface Published {
   snapshot: Pick<Db, SnapshotName>;
 }
 
+/** 로그인하지 않은 사람에게 보여 줄 수 있게 다듬은 게시본 (학생 이름·교사 수업 불가 시간 제외) */
+export interface PublicView {
+  id: 'main';
+  publishedAt: number;
+  snapshot: Pick<Db, SnapshotName>;
+}
+
+export function guestSnapshot(snapshot: Pick<Db, SnapshotName>): Pick<Db, SnapshotName> {
+  const students: Db['students'] = {};
+  for (const s of Object.values(snapshot.students ?? {})) students[s.id] = { ...s, name: '' };
+  const teachers: Db['teachers'] = {};
+  for (const t of Object.values(snapshot.teachers)) teachers[t.id] = { ...t, unavailable: [] };
+  return { ...snapshot, students, teachers };
+}
+
 export const SNAPSHOT: SnapshotName[] = ['settings', 'teachers', 'subjects', 'rooms', 'classes', 'lessons', 'placements', 'students'];
 export type SnapshotName = 'settings' | 'teachers' | 'subjects' | 'rooms' | 'classes' | 'lessons' | 'placements' | 'students';
 
@@ -136,6 +151,7 @@ export interface Collections {
   students: Student;
   changes: Change;
   published: Published;
+  public: PublicView;
 }
 
 export type CollectionName = keyof Collections;
@@ -151,6 +167,7 @@ export const COLLECTIONS: CollectionName[] = [
   'students',
   'changes',
   'published',
+  'public',
 ];
 
 export type Db = { [K in CollectionName]: Record<string, Collections[K]> };
@@ -160,7 +177,7 @@ export type Op =
   | { op: 'del'; collection: CollectionName; id: string };
 
 export function emptyDb(): Db {
-  return { settings: {}, teachers: {}, subjects: {}, rooms: {}, classes: {}, lessons: {}, placements: {}, students: {}, changes: {}, published: {} };
+  return { settings: {}, teachers: {}, subjects: {}, rooms: {}, classes: {}, lessons: {}, placements: {}, students: {}, changes: {}, published: {}, public: {} };
 }
 
 export function defaultSettings(): Settings {
